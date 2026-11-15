@@ -73,8 +73,16 @@ jobs:
 
       # Scan the built image, not just the lockfile: this catches
       # vulnerabilities in the base image's OS packages too.
+      #
+      # Pinned to a commit SHA, not a tag. In March 2026 an attacker with
+      # stolen credentials force-pushed 76 of this action's 77 version tags
+      # to credential-stealing malware (GHSA-69fq-xp46-6x23); the unprefixed
+      # tags were deleted in the cleanup, which is why `@0.36.0` no longer
+      # resolves at all. A tag is a movable pointer and a SHA is not, so a
+      # third-party action that runs with access to this job's token is
+      # pinned by digest and bumped deliberately by Dependabot.
       - name: Scan image
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: market-data-gateway:${{ github.sha }}
           format: table
