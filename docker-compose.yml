@@ -1,0 +1,33 @@
+services:
+  api:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+      # Vendor keys come from a local .env, which is gitignored.
+      VENDOR_A_KEY: ${VENDOR_A_KEY:-unset}
+      VENDOR_B_KEY: ${VENDOR_B_KEY:-unset}
+      VENDOR_C_KEY: ${VENDOR_C_KEY:-unset}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # Defence in depth: the process already runs as `node`, and this stops it
+    # acquiring new privileges even if something in the image is setuid.
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    # Cap memory and evict the oldest keys rather than letting Redis grow until
+    # the host OOMs. Every entry here is a cache entry; losing one is cheap.
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped

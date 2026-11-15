@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch cancels the previous run instead of queueing.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege by default; jobs opt in to anything more.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `ci` not `install`: fails if package-lock.json and package.json disagree,
+      # so a build can never silently resolve a different dependency tree.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Fail the build on a known high-severity advisory in the dependency tree.
+      - run: npm audit --audit-level=high
+
+  docker:
+    name: Build image
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: docker build -t market-data-gateway:${{ github.sha }} .
+
+      # Scan the built image, not just the lockfile: this catches
+      # vulnerabilities in the base image's OS packages too.
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: market-data-gateway:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Smoke test the image
+        run: |
+          docker run -d --name smoke -p 3000:3000 market-data-gateway:${{ github.sha }}
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:3000/health; then
+              echo "healthy"; docker rm -f smoke; exit 0
+            fi
+            sleep 1
+          done
+          echo "service did not become healthy"; docker logs smoke; docker rm -f smoke; exit 1

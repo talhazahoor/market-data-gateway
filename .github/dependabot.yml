@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Patch and minor bumps arrive as one PR per week rather than a dozen.
+    # Majors stay separate because they need reading.
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Actions get pinned and updated too; a compromised action is a supply-chain
+  # risk with write access to the repo.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
