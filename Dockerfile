@@ -25,6 +25,21 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json ./
 
+# Strip the bundled package managers. The container starts the app with
+# `node dist/index.js` and never installs anything, so npm/npx/yarn/corepack
+# are pure attack surface -- and they are the only reason this image fails a
+# HIGH-severity scan: the findings (pacote, brace-expansion, picomatch) are
+# all inside npm's own vendored tree, not in this application's dependency
+# graph. Deleting them is the honest fix; silencing the scanner is not.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx \
+           /usr/local/bin/corepack \
+           /usr/local/bin/yarn \
+           /usr/local/bin/yarnpkg \
+           /opt/yarn-*
+
 USER node
 EXPOSE 3000
 

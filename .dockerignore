@@ -1,0 +1,21 @@
+# Everything here is either rebuilt inside the image or has no business
+# leaving the developer's machine. Without this file the whole working tree
+# (including .git and any local .env) is uploaded to the daemon as build
+# context on every build.
+.git
+.github
+node_modules
+dist
+coverage
+*.log
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+.DS_Store
+README.md
+SECURITY.md
+docker-compose.yml
+Dockerfile
+.dockerignore
